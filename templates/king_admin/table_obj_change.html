@@ -1,0 +1,86 @@
+{%  extends 'king_admin/table_index.html' %}
+{% load tags %}
+
+{% block custom_head_style %}
+    <style>
+        select.filter-select-box{
+            height: 250px;
+            width: 180px;
+            border-radius: 3px;
+        }
+    </style>
+{% endblock %}
+
+
+{% block container %}
+
+    <form class="form-horizontal" role="form" method="post" onsubmit="return SubmitAll()">{% csrf_token %}
+        <span style="color: red">{{ form_obj.errors }}</span>
+        {% for field in form_obj %}
+            <div class="form-group">
+                {% if field.field.required %}
+                    <label class="col-sm-2 control-label" style="font-weight: 500;">
+                        {{ field.label }}
+                    </label>
+                {% else %}
+                    <label class="col-sm-2 control-label">
+                        {{ field.label }}
+                    </label>
+                {% endif %}
+                <div class="col-sm-6">
+                    {% if field.name in admin_class.filter_horizontal %}
+                        <div class="col-md-5">
+                            {% get_all_obj_list form_obj admin_class field as all_obj_list %}
+                            <select id="select_{{ field.name }}_from" class="filter-select-box" multiple="multiple">
+                                {% for obj in all_obj_list %}
+                                    <option value="{{ obj.id }}" ondblclick="MoveElementTo(this,'select_{{ field.name }}_to','select_{{ field.name }}_from')">{{ obj }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            箭头
+                        </div>
+                        <div class="col-md-5">
+                            {% get_selected_obj_list form_obj field as selected_obj_list %}
+                            <select tag="chosen_list" id="select_{{ field.name }}_to"  class="filter-select-box" multiple="multiple" name="{{ field.name }}">
+                                {% for obj in selected_obj_list %}
+                                    <option  value="{{ obj.id }}" ondblclick="MoveElementTo(this,'select_{{ field.name }}_from','select_{{ field.name }}_to')">{{ obj }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    {% else %}
+                        {{ field }}
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+
+	<div class="form-group">
+        <div>
+            <button type="button" class="btn btn-danger pull-left"><a href="{% url 'table_obj_delete' app_name table_name obj_id %}">Delete</a></button>
+		</div>
+		<div class="col-sm-offset-2 col-sm-10">
+			<button type="submit" class="btn btn-success pull-right">Save</button>
+		</div>
+
+	</div>
+</form>
+{% endblock %}
+
+{% block custom_js_content %}
+    <script>
+        function MoveElementTo(self,target_id,source_id) {
+            $(self).attr("ondblclick","MoveElementTo(this,'"+source_id+"','"+target_id+"')");
+            $("#"+target_id).append(self);
+        }
+        function SubmitAll() {
+            $("select[tag='chosen_list'] option").each(function () {
+                $(this).prop("selected",true);
+            })
+            return true;
+        }
+    </script>
+{% endblock %}
+
+
+
