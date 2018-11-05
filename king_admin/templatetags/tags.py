@@ -169,31 +169,49 @@ def get_selected_obj_list(form_obj,field):
         return field_obj.all()
 
 # 递归获取删除的对象关系tree，横向是递归，纵向是循环
-def recursive_related_model(queryset_list, related_model_map,html_str=""):
+def recursive_related_model(queryset_list, related_objects_list,m2m_related_objects_list,html_str=""):
     html_str += "<ul>"
     for obj in queryset_list:
         html_str += "<li>"
-        html_str += str(obj)
-        for related_model_name in related_model_map:  # ManyToMany or OneToMany
-            if related_model_name.endswith("+"):  # ManyToMany
-                obj_set = obj._meta.fields_map[related_model_name].get_accessor_name()
-                m2m_class_name = (obj_set.strip("+")).split("_")[1]
-                m2m_class = getattr(obj, m2m_class_name)
-                sub_related_obj_list = m2m_class.all()
-            else:
-                obj_set = getattr(obj, related_model_map[related_model_name].get_accessor_name())
-                sub_related_obj_list = obj_set.all()
-            sub_related_model_map = related_model_map[related_model_name].related_model._meta.fields_map
-            if sub_related_model_map:
-                ret = recursive_related_model(sub_related_obj_list, sub_related_model_map,html_str="")
-                html_str += ret
-            else:
+        html_str += obj._meta.verbose_name + str(obj)
+
+        for m2m_related_obj in m2m_related_objects_list:  # ManyToMany 正向
+            m2m_related_name = m2m_related_obj.name
+            target_set = getattr(obj,m2m_related_name)
+            sub_m2m_related_obj_list = target_set.select_related()
+            if sub_m2m_related_obj_list:
+                html_str += "<ul>"
+                for sub_m2m_obj in sub_m2m_related_obj_list:
+                    html_str += "<li>"
+                    html_str += m2m_related_obj.related_model._meta.verbose_name + str(sub_m2m_obj)
+                    html_str += "</li>"
+                html_str += "</ul>"
+
+        for related_obj in related_objects_list:  # ManyToMany or OneToMany
+            accessor_name = related_obj.get_accessor_name()
+            target_set = getattr(obj, accessor_name)
+            sub_related_obj_list = target_set.select_related()
+            if "ManyToManyRel" in str(related_obj):  # ManyToMany 反向
                 html_str += "<ul>"
                 for sub_obj in sub_related_obj_list:
                     html_str += "<li>"
-                    html_str += str(sub_obj)
+                    html_str += related_obj.related_model._meta.verbose_name + str(sub_obj)
                     html_str += "</li>"
                 html_str += "</ul>"
+
+            else: # ManyToOne
+                sub_related_objects_list = related_obj.related_model._meta.related_objects
+                sub_m2m_related_objects_list = related_obj.related_model._meta.local_many_to_many
+                if sub_related_objects_list:
+                    ret = recursive_related_model(sub_related_obj_list, sub_related_objects_list,sub_m2m_related_objects_list, html_str="")
+                    html_str += ret
+                else:
+                    html_str += "<ul>"
+                    for sub_obj in sub_related_obj_list:
+                        html_str += "<li>"
+                        html_str += related_obj.related_model._meta.verbose_name+ str(sub_obj)
+                        html_str += "</li>"
+                    html_str += "</ul>"
         html_str += "</li>"
     html_str += "</ul>"
     return html_str
@@ -202,6 +220,7 @@ def recursive_related_model(queryset_list, related_model_map,html_str=""):
 @register.simple_tag
 def display_related_list(admin_class,obj_id):
     queryset_list = admin_class.model.objects.filter(id=obj_id)
-    related_model_map = admin_class.model._meta.fields_map
-    ret = recursive_related_model(queryset_list,related_model_map)
+    related_objects_list = admin_class.model._meta.related_objects
+    m2m_related_objects_list = admin_class.model._meta.local_many_to_many
+    ret = recursive_related_model(queryset_list,related_objects_list,m2m_related_objects_list)
     return mark_safe(ret)
