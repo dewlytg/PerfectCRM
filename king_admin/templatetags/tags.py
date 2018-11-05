@@ -168,7 +168,7 @@ def get_selected_obj_list(form_obj,field):
         field_obj = getattr(form_obj.instance,field.name)
         return field_obj.all()
 
-
+# 递归获取删除的对象关系tree，横向是递归，纵向是循环
 def recursive_related_model(queryset_list, related_model_map,html_str=""):
     html_str += "<ul>"
     for obj in queryset_list:
@@ -186,7 +186,7 @@ def recursive_related_model(queryset_list, related_model_map,html_str=""):
             sub_related_model_map = related_model_map[related_model_name].related_model._meta.fields_map
             if sub_related_model_map:
                 ret = recursive_related_model(sub_related_obj_list, sub_related_model_map,html_str="")
-                html_str+=ret
+                html_str += ret
             else:
                 html_str += "<ul>"
                 for sub_obj in sub_related_obj_list:
@@ -198,10 +198,10 @@ def recursive_related_model(queryset_list, related_model_map,html_str=""):
     html_str += "</ul>"
     return html_str
 
+
 @register.simple_tag
 def display_related_list(admin_class,obj_id):
     queryset_list = admin_class.model.objects.filter(id=obj_id)
     related_model_map = admin_class.model._meta.fields_map
     ret = recursive_related_model(queryset_list,related_model_map)
-    print()
     return mark_safe(ret)
