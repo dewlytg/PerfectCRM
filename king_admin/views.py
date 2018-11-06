@@ -28,6 +28,20 @@ def display_table_objs(request,app_name,table_name):
 
     paginator = Paginator(sorted_object_list, admin_class.list_per_page) # Show 25 contacts per page
 
+    if request.method == "POST":
+        action_delete = request.POST.get("action_delete")
+        if action_delete:
+            objs_id_str = request.POST.get("objs_id_str")
+            objs_id_list = objs_id_str.split(",")
+            admin_class.model.objects.filter(id__in=objs_id_list).delete()
+            return redirect("/king_admin/%s/%s" % (app_name, table_name))
+        selected_ids_str = request.POST.get("selected_ids_str")
+        selected_ids_list = selected_ids_str.split(",")
+        queryset = admin_class.model.objects.filter(id__in=selected_ids_list)
+        selected_action_obj = request.POST.get("selected_action_obj")
+        if hasattr(admin_class,selected_action_obj):
+            action_func = getattr(admin_class,selected_action_obj)
+            return action_func(admin_class,request,queryset)
     page = request.GET.get('page')
     try:
         query_sets = paginator.page(page)
@@ -49,10 +63,11 @@ def display_table_objs(request,app_name,table_name):
 def table_obj_change(request,app_name,table_name,obj_id):
     admin_class = king_admin.enabled_admins[app_name][table_name]
     model_form_class = create_model_form(request,admin_class)
+    obj = admin_class.model.objects.get(id=obj_id)
     if request.method == "GET":
-        form_obj = model_form_class(instance=admin_class.model.objects.get(id=obj_id))
+        form_obj = model_form_class(instance=obj)
     elif request.method == "POST":
-        form_obj = model_form_class(request.POST,instance=admin_class.model.objects.get(id=obj_id))
+        form_obj = model_form_class(request.POST,instance=obj)
         if form_obj.is_valid():
             form_obj.save()
 
@@ -77,7 +92,14 @@ def table_obj_add(request,app_name,table_name):
 
 
 def table_obj_delete(request,app_name,table_name,obj_id):
-    admin_class = king_admin.enabled_admins[app_name][table_name]
-    print(app_name,table_name,obj_id)
-    return render(request,"king_admin/table_obj_delete.html",{"admin_class":admin_class,"obj_id":obj_id})
+    if request.method == "GET":
+        admin_class = king_admin.enabled_admins[app_name][table_name]
+        return render(request, "king_admin/table_obj_delete.html", {"admin_class": admin_class,
+                                                                    "objs": admin_class.model.objects.filter(id=obj_id),
+                                                                    "app_name":app_name,
+                                                                    "table_name":table_name})
+    else:
+        admin_class = king_admin.enabled_admins[app_name][table_name]
+        admin_class.model.objects.filter(id=obj_id).delete()
+        return redirect("/king_admin/%s/%s" %(app_name,table_name))
 
